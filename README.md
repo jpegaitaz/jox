@@ -1,14 +1,32 @@
 # JOX
 
-Local, agentic job-search assistant. Orchestrates **MCP subagents** (starting with a vendored
-LinkedIn MCP server) to search roles, fetch details, compare against your CV, and generate a
-tailored 2-page CV + cover letter. Terminal-first UX.
+Local, agentic job-search assistant. It orchestrates **MCP sub-agents** (vendored) to:
+- search roles (Indeed first; LinkedIn optional),
+- enrich & score them against your CV,
+- generate a tailored **2-page CV** and **cover letter** per short-listed job.
+
+> Terminal-first UX. All processing happens locally except LLM calls.
+
+---
+
+## Features
+
+- **Indeed search** (country-aware TLD, date-window widening, city/alias sweep, `.com` fallback)
+- Optional **LinkedIn** scraping via a hardened Selenium driver
+- Heuristic **compatibility scoring** vs your current CV + knowledge base
+- Auto-rendered **PDF CV** + **PDF cover letter** per shortlisted role
+- Session report + artifacts saved under `outputs/`
+
+---
 
 ## Quick start
 
 ```bash
 cp .env.example .env
-# edit .env to include LINKEDIN_COOKIE='li_at=...'
+# edit .env and set at least:
+#   OPENAI_API_KEY=sk-...
+# Optional (only if you plan to use LinkedIn tools):
+#   LINKEDIN_COOKIE='li_at=...'
 
 # (optional) create venv
 python -m venv .venv && source .venv/bin/activate
