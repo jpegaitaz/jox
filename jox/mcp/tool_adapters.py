@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Callable, TypeVar, Optional
 import logging
 import time
+import asyncio
 
 # LinkedIn helpers still rely on the hardened Selenium driver
 from jox.mcp.servers.linkedin_mcp_server.error_handler import safe_get_driver
@@ -373,3 +374,35 @@ class LinkedInTools:
             logger.warning("Recommended jobs failed after retries (%s). Returning empty list.", e)
             return []
 
+class JobupTools:
+    """
+    Lightweight Jobup adapter using its own headless Chrome (no LinkedIn auth).
+    """
+    def __init__(self) -> None:
+        from jox.mcp.servers.jobup_mcp_server.tools import search_jobs as _s, get_job_details as _d
+        self._search = _s
+        self._details = _d
+
+    async def search_jobs(
+        self,
+        search_term: str,
+        location: str = "",
+        days: int = 7,     # ignored by Jobup, kept for signature compatibility
+        limit: int = 30,
+        *,
+        country: Optional[str] = None,  # unused for jobup
+    ) -> List[Dict[str, Any]]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: self._search(search_term, location, limit))
+
+    async def get_job_details(self, job_id_or_url: str) -> Dict[str, Any]:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: self._details(job_id_or_url))
+
+
+def get_job_tools(source: str):
+    src = (source or "").lower().strip()
+    if src == "jobup":
+        return JobupTools()
+    # default
+    return IndeedTools()
