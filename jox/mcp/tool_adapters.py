@@ -1,9 +1,10 @@
 # jox/mcp/tool_adapters.py
 from __future__ import annotations
-from typing import Dict, Any, List, Callable, TypeVar, Optional
+
+import asyncio
 import logging
 import time
-import asyncio
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 # LinkedIn helpers still rely on the hardened Selenium driver
 from jox.mcp.servers.linkedin_mcp_server.error_handler import safe_get_driver
@@ -40,7 +41,7 @@ def _with_retries(
         except WebDriverException as e:  # type: ignore
             last_err = e
             logger.warning("%s webdriver error (attempt %d/%d): %s", context, i, attempts, e)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             last_err = e
             logger.warning("%s failed (attempt %d/%d): %s", context, i, attempts, e)
 
@@ -56,9 +57,17 @@ def _with_retries(
     raise last_err
 
 
+# ---------------------------
+# Indeed adapter (sync funcs)
+# ---------------------------
 class IndeedTools:
     def __init__(self) -> None:
-        from jox.mcp.servers.indeed_mcp_server import search_jobs as _s, get_job_details as _d
+        # ✅ point to the module, not the package
+        from jox.mcp.servers.indeed_mcp_server.tools import (  # type: ignore
+            search_jobs as _s,
+            get_job_details as _d,
+        )
+
         self._search = _s
         self._details = _d
 
@@ -70,8 +79,7 @@ class IndeedTools:
         limit: int = 20,
         *,
         country: Optional[str] = None,
-    ):
-        import asyncio
+    ) -> List[Dict[str, Any]]:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
             None,
@@ -85,11 +93,13 @@ class IndeedTools:
         )
 
     async def get_job_details(self, job_id_or_url: str) -> Dict[str, Any]:
-        import asyncio
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self._details(job_id_or_url))
 
 
+# ---------------------------
+# LinkedIn adapter (selenium)
+# ---------------------------
 class LinkedInTools:
     """
     Direct adapters (no MCP client): use our vendored driver manager + linkedin_scraper.
@@ -97,8 +107,7 @@ class LinkedInTools:
     """
 
     def __init__(self) -> None:
-        # Defer heavy imports until actually used to speed up CLI launch
-        pass
+        pass  # defer heavy imports to methods
 
     async def get_person_profile(self, username: str) -> Dict[str, Any]:
         from linkedin_scraper import Person  # type: ignore
@@ -220,22 +229,18 @@ class LinkedInTools:
         )
 
     async def search_jobs(self, search_term: str) -> List[Dict[str, Any]]:
-        """
-        Primary: linkedin_scraper.JobSearch (fast path).
-        Fallback: open Jobs search URL, handle consent, scroll & harvest /jobs/view/ links.
-        """
         from urllib.parse import quote_plus
         import time as _time
-        from selenium.webdriver.common.by import By
+        from selenium.webdriver.common.by import By as _By
         from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC  # noqa: F401  (kept for future use)
+        from selenium.webdriver.support import expected_conditions as EC  # noqa: F401
         from selenium.common.exceptions import TimeoutException, NoSuchElementException
         from linkedin_scraper import JobSearch  # type: ignore
 
         driver = safe_get_driver()
         logger.info("Searching jobs: %s", search_term)
 
-        # 1) Library path (single attempt)
+        # Library path
         try:
             js = JobSearch(driver=driver, close_on_complete=False, scrape=False)
             jobs = js.search(search_term)
@@ -243,7 +248,7 @@ class LinkedInTools:
         except TimeoutException:
             logger.warning("job search timed out in library path; using URL fallback.")
 
-        # 2) URL fallback
+        # Fallback path (URL harvesting)
         tokens = search_term.split()
         location = tokens[-1] if len(tokens) > 1 else ""
         keywords = " ".join(tokens[:-1]) or search_term
@@ -268,8 +273,7 @@ class LinkedInTools:
             ]
             for by, sel in candidates:
                 try:
-                    from selenium.webdriver.common.by import By as _By
-                    btn = driver.find_element(getattr(_By, by.replace(" ", "_").upper()), sel)
+                    btn = driver.find_element(_By.CSS_SELECTOR if by == "css selector" else _By.XPATH, sel)
                     if btn.is_displayed():
                         btn.click()
                         logger.info("Dismissed cookie banner via selector: %s", sel)
@@ -289,12 +293,11 @@ class LinkedInTools:
             "div.jobs-search__results-list",
         ]
 
-        def _any_results_present(driver):
-            from selenium.webdriver.common.by import By as _By
+        def _any_results_present(drv):
             for sel in container_selectors:
-                if driver.find_elements(_By.CSS_SELECTOR, sel):
+                if drv.find_elements(_By.CSS_SELECTOR, sel):
                     return True
-            links = driver.find_elements(_By.CSS_SELECTOR, "a[href*='/jobs/view/']")
+            links = drv.find_elements(_By.CSS_SELECTOR, "a[href*='/jobs/view/']")
             return len(links) > 0
 
         try:
@@ -303,15 +306,15 @@ class LinkedInTools:
         except TimeoutException:
             logger.warning("No results signal yet—continuing with scroll harvesting.")
 
-        driver.execute_script("window.scrollTo(0, 0);")
+        drv = driver
+        drv.execute_script("window.scrollTo(0, 0);")
         _time.sleep(0.8)
 
         results: List[Dict[str, Any]] = []
         seen = set()
 
         def _harvest_now() -> int:
-            from selenium.webdriver.common.by import By as _By
-            links = driver.find_elements(_By.CSS_SELECTOR, "a[href*='/jobs/view/']")
+            links = drv.find_elements(_By.CSS_SELECTOR, "a[href*='/jobs/view/']")
             added = 0
             for a in links:
                 href = a.get_attribute("href") or ""
@@ -323,9 +326,7 @@ class LinkedInTools:
                     continue
                 seen.add(jid)
                 title = (a.text or "").strip()
-                results.append(
-                    {"job_id": jid, "job_url": f"https://www.linkedin.com/jobs/view/{jid}/", "title": title}
-                )
+                results.append({"job_id": jid, "job_url": f"https://www.linkedin.com/jobs/view/{jid}/", "title": title})
                 added += 1
             return added
 
@@ -333,11 +334,11 @@ class LinkedInTools:
         last_log = start
         while _time.time() - start < 20:
             _harvest_now()
-            driver.execute_script("window.scrollBy(0, 800);")
+            drv.execute_script("window.scrollBy(0, 800);")
             _time.sleep(0.6)
-            driver.execute_script("window.scrollBy(0, 1200);")
+            drv.execute_script("window.scrollBy(0, 1200);")
             _time.sleep(0.6)
-            driver.execute_script("window.scrollTo(0, 0);")
+            drv.execute_script("window.scrollTo(0, 0);")
             _time.sleep(0.5)
 
             now = _time.time()
@@ -352,57 +353,52 @@ class LinkedInTools:
         logger.info("URL fallback collected %d jobs", len(results))
         return results
 
-    async def get_recommended_jobs(self) -> List[Dict[str, Any]]:
-        from linkedin_scraper import JobSearch  # type: ignore
 
-        driver = safe_get_driver()
-        logger.info("Getting recommended jobs")
-
-        def _do() -> List[Dict[str, Any]]:
-            js = JobSearch(driver=driver, close_on_complete=False, scrape=True, scrape_recommended_jobs=True)
-            recs = getattr(js, "recommended_jobs", None) or []
-            return [j.to_dict() for j in recs]
-
-        try:
-            return _with_retries(
-                _do,
-                attempts=2,
-                context="recommended jobs",
-                recover=lambda: driver.refresh(),
-            )
-        except Exception as e:
-            logger.warning("Recommended jobs failed after retries (%s). Returning empty list.", e)
-            return []
-
+# ---------------------------
+# Jobup adapter (async funcs)
+# ---------------------------
 class JobupTools:
     """
     Lightweight Jobup adapter using its own headless Chrome (no LinkedIn auth).
     """
     def __init__(self) -> None:
-        from jox.mcp.servers.jobup_mcp_server.tools import search_jobs as _s, get_job_details as _d
-        self._search = _s
-        self._details = _d
+        # ✅ import the ASYNC functions and await them directly
+        from jox.mcp.servers.jobup_mcp_server.tools import (  # type: ignore
+            search_jobs as _search_async,
+            get_job_details as _details_async,
+        )
+        self._search_async = _search_async
+        self._details_async = _details_async
 
     async def search_jobs(
         self,
         search_term: str,
         location: str = "",
-        days: int = 7,     # ignored by Jobup, kept for signature compatibility
+        days: int = 7,     # ignored by Jobup; kept for signature compatibility
         limit: int = 30,
         *,
-        country: Optional[str] = None,  # unused for jobup
+        country: Optional[str] = None,  # unused for Jobup
     ) -> List[Dict[str, Any]]:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self._search(search_term, location, limit))
+        return await self._search_async(search_term, location, limit)
 
     async def get_job_details(self, job_id_or_url: str) -> Dict[str, Any]:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self._details(job_id_or_url))
+        return await self._details_async(job_id_or_url)
 
 
+# ---------------------------
+# Factory
+# ---------------------------
 def get_job_tools(source: str):
-    src = (source or "").lower().strip()
+    """
+    Return an adapter INSTANCE for the requested source.
+    """
+    src = (source or "").strip().lower()
     if src == "jobup":
         return JobupTools()
+    if src == "linkedin":
+        return LinkedInTools()
     # default
     return IndeedTools()
+
+
+__all__ = ["get_job_tools", "IndeedTools", "LinkedInTools", "JobupTools"]

@@ -1,12 +1,15 @@
 # jox/mcp/servers/jobup_mcp_server/tools.py
 from __future__ import annotations
-import logging, time
-from typing import List, Dict, Any, Optional
-from urllib.parse import urlencode
+
+import asyncio
+import logging
+import time
+from typing import List, Dict, Any
+from urllib.parse import quote, urljoin
 
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import NoSuchElementException
+
 from .driver import get_simple_driver
 
 logger = logging.getLogger(__name__)
@@ -15,7 +18,6 @@ BASE = "https://www.jobup.ch/fr/emplois/"
 
 
 def _search_url(term: str, location: str) -> str:
-    from urllib.parse import quote
     return f"{BASE}?term={quote(term)}&location={quote(location)}"
 
 
@@ -27,43 +29,49 @@ def _parse_cards(html: str) -> List[Dict[str, Any]]:
     soup = BeautifulSoup(html, "html.parser")
     out: List[Dict[str, Any]] = []
 
-    # Prefer explicit result anchors
+    # Each card links to /fr/emplois/detail/<id>/
     for a in soup.select("a[href*='/fr/emplois/detail/']"):
         href = a.get("href") or ""
         if not href:
             continue
+
         title = _safe_text(a)
         card = a.find_parent("article") or a.find_parent("li") or a.find_parent("div")
+
         company_el = None
-        for sel in [
+        for sel in (
             "[data-cy='company-name']",
+            "a[data-cy='company-name']",
             ".company-name",
             ".CompanyName",
             ".company",
-            "a[data-cy='company-name']",
-        ]:
+        ):
             company_el = (card.select_one(sel) if card else None) or company_el
+
         loc_el = None
-        for sel in [
+        for sel in (
             "[data-cy='job-location']",
             ".job-location",
             ".JobLocation",
             ".location",
-        ]:
+        ):
             loc_el = (card.select_one(sel) if card else None) or loc_el
 
         company = _safe_text(company_el)
         location = _safe_text(loc_el)
         jid = href.rstrip("/").split("/")[-1].split("?")[0]
-        out.append({
-            "id": jid or href,
-            "title": title,
-            "company": company if company != title else "",
-            "location": location,
-            "url": "https://www.jobup.ch" + href if href.startswith("/") else href,
-        })
 
-    # de-dupe by id
+        out.append(
+            {
+                "id": jid or href,
+                "title": title,
+                "company": company if company != title else "",
+                "location": location,
+                "url": urljoin("https://www.jobup.ch", href) if href.startswith("/") else href,
+            }
+        )
+
+    # De-dupe by id/url
     seen, dedup = set(), []
     for r in out:
         k = r["id"] or r["url"]
@@ -74,125 +82,177 @@ def _parse_cards(html: str) -> List[Dict[str, Any]]:
     return dedup
 
 
-def search_jobs(term: str, location: str, limit: int = 30) -> List[Dict[str, Any]]:
-    url = _search_url(term, location)
-    logger.info("Jobup search: q='%s', l='%s', limit=%s (%s)", term, location, limit, url)
-
-    driver = get_simple_driver()
-    try:
-        driver.get(url)
-        time.sleep(1.0)
-
-        # Dismiss cookie banner if present
-        for sel in [
-            "button#onetrust-accept-btn-handler",
-            "button[aria-label*='Accepter']",
-            "button[aria-label*='Accept']",
-        ]:
-            try:
-                btns = driver.find_elements(By.CSS_SELECTOR, sel)
-                if btns:
-                    btns[0].click()
-                    time.sleep(0.4)
-                    break
-            except Exception:
-                pass
-
-        results: List[Dict[str, Any]] = []
-        seen = 0
-        # Scroll a few times to load virtualized content
-        for _ in range(12):
-            driver.execute_script("window.scrollBy(0, 1200);")
-            time.sleep(0.5)
-            results = _parse_cards(driver.page_source)
-            if len(results) >= limit:
-                break
-            if len(results) == seen:
-                # no growth — stop
-                break
-            seen = len(results)
-
-        return results[:limit]
-    finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
-
-
-def _try_click(driver, selectors: list[str]) -> None:
+def _try_click_css(driver, selectors: list[str]) -> bool:
     for sel in selectors:
         try:
             el = driver.find_element(By.CSS_SELECTOR, sel)
             el.click()
             time.sleep(0.2)
-            return
+            return True
         except Exception:
             continue
+    return False
 
 
-def get_job_details(job_url_or_id: str) -> Dict[str, Any]:
-    """
-    Open a Jobup job page, expand 'see more' toggles, and extract a robust description.
-    """
-    url = job_url_or_id
-    if not url.startswith("http"):
+def _try_click_xpath(driver, xpaths: list[str]) -> bool:
+    for xp in xpaths:
+        try:
+            el = driver.find_element(By.XPATH, xp)
+            el.click()
+            time.sleep(0.2)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _search_jobs_sync(term: str, location: str, limit: int = 30) -> List[Dict[str, Any]]:
+    url = _search_url(term, location)
+    logger.info("Jobup search: q='%s', l='%s', limit=%s (%s)", term, location, limit, url)
+
+    driver = get_simple_driver()
+    driver.get(url)
+    time.sleep(1.0)
+
+    # Accept cookies (best-effort)
+    _try_click_css(
+        driver,
+        [
+            "#didomi-notice-agree-button",
+            "button[data-cy='accept-all']",
+            "button#onetrust-accept-btn-handler",
+            "button[aria-label*='Accepter']",
+            "button[aria-label*='Accept']",
+        ],
+    )
+
+    results: List[Dict[str, Any]] = []
+    seen = 0
+
+    # Scroll to load more virtualized rows
+    for _ in range(12):
+        driver.execute_script("window.scrollBy(0, 1200);")
+        time.sleep(0.5)
+        results = _parse_cards(driver.page_source)
+        if len(results) >= limit:
+            break
+        if len(results) == seen:
+            break
+        seen = len(results)
+
+    return results[:limit]
+
+
+async def search_jobs(term: str, location: str, limit: int = 30) -> List[Dict[str, Any]]:
+    """Async wrapper for the blocking Selenium search."""
+    return await asyncio.to_thread(_search_jobs_sync, term, location, limit)
+
+
+def _get_job_details_sync(job_url_or_id: str) -> Dict[str, Any]:
+    if job_url_or_id.startswith("http"):
+        url = job_url_or_id
+    else:
         url = f"https://www.jobup.ch/fr/emplois/detail/{job_url_or_id}/"
 
     driver = get_simple_driver()
-    try:
-        driver.get(url)
-        time.sleep(0.8)
+    logger.info("Jobup details: %s", url)
 
-        # Expand typical "Voir plus" sections if they exist
-        _try_click(driver, [
+    driver.get(url)
+    time.sleep(0.8)
+
+    # Cookie notice (ignore failures)
+    _try_click_css(driver, ["#didomi-notice-agree-button", "button[data-cy='accept-all']"])
+
+    # Expand description areas if present
+    _try_click_css(
+        driver,
+        [
+            "button[data-cy='vacancy-description__show-more']",
             "button[aria-expanded='false'][aria-controls*='description']",
-            "button:has(span:contains('Voir plus'))",
             "button[aria-label*='Voir plus']",
             "button[aria-label*='Show more']",
-        ])
-        time.sleep(0.3)
+        ],
+    )
+    _try_click_xpath(
+        driver,
+        [
+            "//button[contains(., 'Voir plus')]",
+            "//button[contains(., 'Afficher plus')]",
+            "//button[contains(., 'Show more')]",
+        ],
+    )
+    time.sleep(0.3)
 
-        html = driver.page_source
-        soup = BeautifulSoup(html, "html.parser")
+    html = driver.page_source
+    soup = BeautifulSoup(html, "html.parser")
 
-        title_el = soup.select_one("h1, [data-cy='job-title']")
-        company_el = soup.select_one("[data-cy='company-name'], .company, .company-name")
-        location_el = soup.select_one("[data-cy='job-location'], .location, .job-location")
+    # Title / company / location — multiple fallbacks
+    title_el = soup.select_one("[data-cy='vacancy-title'], h1[data-cy='job-title'], h1.textStyle_h3, h1")
+    company_el = soup.select_one(
+        "[data-cy='vacancy-company'], [data-cy='company-name'], .company, .company-name, a[data-cy='company-link']"
+    )
+    location_el = soup.select_one("[data-cy='vacancy-location'], [data-cy='job-location'], .location, .job-location")
 
-        # Grab all candidate description blocks and concatenate
-        desc_parts = []
-        for sel in [
-            "[data-cy='job-description']",
+    # Full description
+    desc_el = soup.select_one("div[data-cy='vacancy-description']")
+    description = _safe_text(desc_el)
+
+    if not description:
+        for sel in (
+            "section[data-cy='job-description']",
             "section.job-description",
             "div[data-testid='job-description']",
             "section[data-cy='job-ad']",
-            "article",
+            "article.vacancy-description",
+            "div.area_description",
             "main",
-        ]:
-            for d in soup.select(sel):
-                txt = _safe_text(d)
-                if txt and txt not in desc_parts:
-                    desc_parts.append(txt)
-        description = "\n\n".join(desc_parts).strip()
+        ):
+            cand = soup.select_one(sel)
+            description = _safe_text(cand)
+            if description:
+                break
 
-        # ultra-fallback: take center column main text
-        if not description:
-            main = soup.find("main")
-            description = _safe_text(main)
+    # Derive job id from URL
+    cur_url = driver.current_url or url
+    parts = [p for p in cur_url.rstrip("/").split("/") if p]
+    job_id = None
+    for part in reversed(parts):
+        if part.isdigit():
+            job_id = part
+            break
+    job_id = job_id or cur_url
 
-        jid = url.rstrip("/").split("/")[-2] if "/detail/" in url else url
+    return {
+        "job_id": job_id,
+        "job_url": cur_url,
+        "title": _safe_text(title_el),
+        "company": _safe_text(company_el),
+        "location": _safe_text(location_el),
+        "description": description,
+    }
 
-        return {
-            "job_id": jid,
-            "job_url": url,
-            "title": _safe_text(title_el),
-            "company": _safe_text(company_el),
-            "location": _safe_text(location_el),
-            "description": description,
-        }
-    finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
+
+async def get_job_details(job_url_or_id: str) -> Dict[str, Any]:
+    """Async wrapper for the blocking Selenium detail fetch."""
+    return await asyncio.to_thread(_get_job_details_sync, job_url_or_id)
+
+
+# Adapter for jox.mcp.tool_adapters.get_job_tools('jobup')
+class JobupTools:
+    async def search_jobs(
+        self,
+        search_term: str = "",
+        location: str = "",
+        days: int = 7,
+        limit: int = 30,
+        country: str = "",
+        **kwargs,
+    ):
+        """
+        Accepts both (search_term, location) and (term, location) to be resilient to callers.
+        """
+        term = search_term or kwargs.get("term", "")
+        return await search_jobs(term, location, limit=limit)
+
+    async def get_job_details(self, url_or_id: str, **_):
+        return await get_job_details(url_or_id)
