@@ -397,6 +397,9 @@ def get_job_tools(source: str):
         return JobupTools()
     if src == "linkedin":
         return LinkedInTools()
+    if src == "jobs":
+        from jox.mcp.servers.jobs_mcp_server import tools as job_tools
+        return job_tools
     # default
     return IndeedTools()
 

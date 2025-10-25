@@ -588,5 +588,48 @@
       "outputs/artifacts/coverletter_Sales Manager_2025-10-25.pdf"
     ],
     "notes": ""
+  },
+  {
+    "session_id": "06af6ca5-31f7-4c33-8465-659b8f0b28f5",
+    "date": "2025-10-25T16:55:42.383670+00:00",
+    "topic": "Investment Analyst Finance Zurich",
+    "description": "QuickAndReady completed. 0 shortlisted / 0 results.",
+    "files": [],
+    "notes": ""
+  },
+  {
+    "session_id": "39c977d6-0530-4382-b698-090e78c098a8",
+    "date": "2025-10-25T16:58:18.817127+00:00",
+    "topic": "Business Development Manager Sales Zurich",
+    "description": "QuickAndReady completed. 0 shortlisted / 0 results.",
+    "files": [],
+    "notes": ""
+  },
+  {
+    "session_id": "b6df3798-eaea-4cc8-b741-bb8f6f84724b",
+    "date": "2025-10-25T17:07:33.019767+00:00",
+    "topic": "Business Development Sales Geneva",
+    "description": "QuickAndReady completed. 0 shortlisted / 0 results.",
+    "files": [],
+    "notes": ""
+  },
+  {
+    "session_id": "e7ca8d8d-9fec-434d-a7e9-c61a7a14bd9d",
+    "date": "2025-10-25T17:32:51.157494+00:00",
+    "topic": "Investment Analyst Finance Geneva",
+    "description": "QuickAndReady completed. 5 shortlisted / 18 results.",
+    "files": [
+      "outputs/artifacts/cv_Data Analyst_2025-10-25.pdf",
+      "outputs/artifacts/coverletter_Data Analyst_2025-10-25.pdf",
+      "outputs/artifacts/cv_Data Analyst_2025-10-25.pdf",
+      "outputs/artifacts/coverletter_Data Analyst_2025-10-25.pdf",
+      "outputs/artifacts/cv_Financial Analyst_2025-10-25.pdf",
+      "outputs/artifacts/coverletter_Financial Analyst_2025-10-25.pdf",
+      "outputs/artifacts/cv_Business Analyst – Client Platform Advisory (80-100%)_2025-10-25.pdf",
+      "outputs/artifacts/coverletter_Business Analyst – Client Platform Advisory (80-100%)_2025-10-25.pdf",
+      "outputs/artifacts/cv_Junior Technology Analyst_2025-10-25.pdf",
+      "outputs/artifacts/coverletter_Junior Technology Analyst_2025-10-25.pdf"
+    ],
+    "notes": ""
   }
 ]

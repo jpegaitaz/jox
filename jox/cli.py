@@ -137,8 +137,8 @@ def main(
     default_source = os.getenv("JOB_SOURCE", getattr(SETTINGS, "job_source", "indeed")) or "indeed"
     job_source = Prompt.ask(
         "Choose job source",
-        choices=["indeed", "jobup"],
-        default=default_source,
+        choices=["indeed", "jobup", "jobs"],  # ← added "jobs"
+        default=default_source if default_source in {"indeed","jobup","jobs"} else "indeed",
         show_choices=True,
     )
     # Apply selection for this run
