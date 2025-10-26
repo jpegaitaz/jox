@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Tuple, Dict, List, NamedTuple, Optional
 import logging
 import re
+import random
 
 from .evaluator import evaluate_ai_likeness
 
@@ -17,8 +18,9 @@ class IterLog(NamedTuple):
     note: Optional[str] = None
 
 
-# ---------- de-cliché + neutral expansion ----------
+# ---------- de-cliché + neutral expansion (with signature awareness) ----------
 
+# When a block is very short, expand it a bit to break template-y shapes.
 _MIN_EXPAND_CHARS = 140      # expand to exceed this length when text is too short
 _TARGET_EXPAND_CHARS = 200   # soft target to avoid bloating
 
@@ -42,8 +44,25 @@ _CLICHE_SWAPS = {
     r"\bin charge of\b": "I owned",
 }
 
+# stylistic nudge: contractions + soft adverb pruning
+_CONTRACTIONS = {
+    r"\bI am\b": "I’m",
+    r"\bI have\b": "I’ve",
+    r"\bI will\b": "I’ll",
+    r"\bI would\b": "I’d",
+    r"\bwe are\b": "we’re",
+    r"\bwe have\b": "we’ve",
+    r"\bwe will\b": "we’ll",
+    r"\bdo not\b": "don’t",
+    r"\bcan not\b": "can’t",
+    r"\bcannot\b": "can’t",
+    r"\bis not\b": "isn’t",
+    r"\bare not\b": "aren’t",
+}
+_COMMON_ADVERBS = r"\b(really|highly|extremely|very|deeply|truly|significantly)\b"
+
 # Neutral “evidence scaffolds” to expand text without inventing facts.
-# We reuse words already present in the text via _pick_hints; no numbers/names are created.
+# We reuse words already present in the text via _pick_hints; no numbers/names added.
 _EXPANSION_TEMPLATES = [
     " In practice, that means I {verb_hint} {object_hint} with attention to {detail_hint}.",
     " I prefer concrete steps — defining the scope, setting a simple plan, and adjusting based on feedback.",
@@ -51,6 +70,18 @@ _EXPANSION_TEMPLATES = [
     " I’m careful to avoid generic claims and instead reference the responsibilities in the posting.",
     " I focus on the essentials first, then add context only where it helps a decision.",
 ]
+
+# Small pragmatic next-step cues (detectors favor these over generic closers)
+_NEXT_STEP_TPLS = [
+    " If helpful, I can share a brief example of {object_hint} this week.",
+    " Happy to outline a simple plan and timelines in a short call.",
+    " If useful, I can send a concise note on how I’d {verb_hint} {object_hint}.",
+]
+
+# Detect the start of a signature/valediction block (don’t expand after this).
+_SIG_PAT = re.compile(
+    r"(?im)^\s*(?:kind regards|best regards|sincerely|many thanks|cordially)\s*,?\s*$"
+)
 
 
 def _pick_hints(text: str) -> dict:
@@ -85,6 +116,18 @@ def _decliche(text: str) -> str:
     for pat, repl in _CLICHE_SWAPS.items():
         out = re.sub(pat, repl, out, flags=re.IGNORECASE)
     return out
+
+
+def _contractionize(text: str) -> str:
+    out = text
+    for pat, repl in _CONTRACTIONS.items():
+        out = re.sub(pat, repl, out, flags=re.IGNORECASE)
+    return out
+
+
+def _trim_adverbs(text: str) -> str:
+    # soft prune stacked amplifiers (e.g., "really very" -> "very")
+    return re.sub(fr"(?:{_COMMON_ADVERBS})(\s+{_COMMON_ADVERBS})+", r"\1", text, flags=re.IGNORECASE)
 
 
 def _vary_cadence(text: str) -> str:
@@ -124,6 +167,22 @@ def _vary_cadence(text: str) -> str:
     return " ".join(balanced)
 
 
+def _split_before_signature(text: str) -> tuple[str, str]:
+    """
+    Return (main, signature_block). If a valediction like 'Kind regards,' is found,
+    everything from that line onward is considered the signature block.
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if _SIG_PAT.match(line.strip()):
+            return "\n".join(lines[:i]).rstrip(), "\n".join(lines[i:]).lstrip()
+    return text, ""  # no signature found
+
+
+def _rejoin_with_signature(main: str, sig: str) -> str:
+    return (main.rstrip() + "\n\n" + sig.lstrip()).strip() if sig else main
+
+
 def _expand(text: str, target_len: int = _TARGET_EXPAND_CHARS) -> str:
     """
     Expand neutrally using templates + hints drawn only from the existing text.
@@ -137,30 +196,35 @@ def _expand(text: str, target_len: int = _TARGET_EXPAND_CHARS) -> str:
         if len(out) >= target_len:
             break
         out = (out.rstrip() + tpl.format(**hints)).strip()
+    # Add one pragmatic next-step (detectors reward this)
+    if len(out) < target_len - 20:
+        out = (out.rstrip() + random.choice(_NEXT_STEP_TPLS).format(**hints)).strip()
     return out
 
 
 def _humanize_pass(text: str, iteration: int) -> str:
     """
     One pass:
-      1) remove clichés
-      2) vary cadence
-      3) if very short, EXPAND to exceed _MIN_EXPAND_CHARS (target ~140 chars)
+      1) split off signature/valediction
+      2) de-cliché → contractions → adverb trim → cadence on the main body
+      3) if short, EXPAND the main body (signature stays untouched)
+      4) re-join with signature
     """
-    before = text
-    after = _decliche(before)
+    main, sig = _split_before_signature(text)
+
+    after = _decliche(main)
+    after = _contractionize(after)
+    after = _trim_adverbs(after)
     after = _vary_cadence(after)
 
     if len(after) < _MIN_EXPAND_CHARS:
         expanded = _expand(after, _TARGET_EXPAND_CHARS)
         if len(expanded) > len(after):
-            logger.info(
-                "AI-Guard | expand | iter %d | expanded %d→%d chars",
-                iteration, len(after), len(expanded)
-            )
+            logger.info("AI-Guard | expand | iter %d | expanded %d→%d chars",
+                        iteration, len(after), len(expanded))
         after = expanded
 
-    return after
+    return _rejoin_with_signature(after, sig)
 
 
 # ---------- public API ----------
@@ -194,23 +258,13 @@ def reduce_ai_likeness(
             break
         candidate = _humanize_pass(current, i)
         score = evaluate_ai_likeness(candidate)
-        logger.info(
-            "AI-Guard | %s | iter %d → %.1f%% (target ≤ %d%%)",
-            name, i, score, target
-        )
+        logger.info("AI-Guard | %s | iter %d → %.1f%% (target ≤ %d%%)", name, i, score, target)
         logs.append(IterLog(iter=i, score=score))
 
+        # keep the best seen
         if score < best_score:
             best_score, best_text = score, candidate
         current = candidate
 
-    serial_logs = [
-        {"iter": l.iter, "score": float(l.score), "note": l.note or ""}
-        for l in logs
-    ]
-    return best_text, {
-        "label": name,
-        "target": target,
-        "max_iters": iters,
-        "runs": serial_logs,
-    }
+    serial_logs = [{"iter": l.iter, "score": float(l.score), "note": l.note or ""} for l in logs]
+    return best_text, {"label": name, "target": target, "max_iters": iters, "runs": serial_logs}
