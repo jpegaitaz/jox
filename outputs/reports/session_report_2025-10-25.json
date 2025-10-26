@@ -1,0 +1,134 @@
+{
+  "session_id": "3ec36c20-e666-4187-807e-7a2e06d6debc",
+  "search_term": "Business Development Specialist Finance Lausanne",
+  "number_of_results": 2,
+  "number_of_compatible_results": 2,
+  "number_of_outputs_generated": 4,
+  "all_results": [
+    {
+      "Job Post Title": "Senior Blockchain Developer - DeFi",
+      "Company": "FINDERS SA",
+      "Compatibility Score": 1.8672199170124482,
+      "job_id": "https://www.jobup.ch/fr/emplois/detail/39f8e819-88b1-4ff1-8126-3cbceb656fe3/",
+      "job_url": "https://www.jobup.ch/fr/emplois/detail/39f8e819-88b1-4ff1-8126-3cbceb656fe3/",
+      "location": "Lausanne",
+      "Description": "ðŸ§ Senior Blockchain Engineer - DeFi / Smart Contracts ðŸ“ Lausanne, Switzerland (Hybrid) | ðŸ•“ 80-100% | ðŸ“ Permanent contract A fast-growing Swiss technology company is looking for an experienced Senior Blockchain Engineer to strengthen its DeFi product team. In this role, you'll be at the heart of designing and building innovative decentralized finance solutions, working in a collaborative environment where new ideas are encouraged and quickly turned into reality. ðŸš€ Your Mission Take ownership of the design, development, testing and deployment of smart contracts within a sophisticated DeFi ecosystem. Translate business and product requirements into secure, scalable blockchain architectures . Work hand-in-hand with fellow engineers, product owners and other stakeholders to deliver new blockchain functionalities . Apply rigorous testing methodologies (unit, integration, fuzzing) to ensure robustness and security. Help evolve the blockchain infrastructure , improve internal tools, and streamline development workflows. Keep a close eye on emerging DeFi trends , L2 solutions and smart contract best practices to push innovation forward. ðŸ§° What You Bring A deep interest in DeFi innovation and blockchain technologies, coupled with strong analytical and problem-solving skills. The ability to thrive in a fast-moving environment , make informed decisions with partial information, and work autonomously while collaborating effectively. Several years of hands-on blockchain development , including: Advanced proficiency in Solidity and smart contract security. Solid understanding of DeFi primitives, DEXs, and liquidity mechanisms . Strong generalist software engineering background (multiple languages, testing, clean architecture). Experience working in multidisciplinary engineering teams on complex, scalable codebases. Leadership experience is a plus. Excellent communication skills in English; proficiency in French is a strong asset. ðŸ§ª Our Technical Environment Blockchain: EVM-compatible chains, Solidity, Foundry/Hardhat toolchains, extensive smart contract test coverage including fuzzing and property-based testing. Frontend: Modern TypeScript stack with React-based frameworks, tightly integrated with blockchain backends. Backend & Infrastructure: Node.js, REST/GraphQL APIs, Dockerized services, CI/CD pipelines for rapid iteration and secure deployments. Architecture: Modular on-chain/off-chain integration, data indexing, monitoring and analytics dashboards to ensure reliability and performance. Culture: Developer-driven workflows, open discussions on architecture choices, strong emphasis on code quality, security, and peer review. ðŸŒŸ Why Join Collaborate with a high-caliber team of blockchain specialists to build cutting-edge DeFi products. Benefit from a competitive compensation package aligned with your expertise. Enjoy a hybrid working model , with two remote days per week and flexible hours. Contribute to impactful projects at the forefront of the DeFi ecosystem."
+    },
+    {
+      "Job Post Title": "Tax Accounting Consultant / Senior Consultant - Corporate Tax",
+      "Company": "KPMG",
+      "Compatibility Score": 2.8571428571428568,
+      "job_id": "https://www.jobup.ch/fr/emplois/detail/f91c0b68-7089-4ca2-a6de-090ccd1f418f/",
+      "job_url": "https://www.jobup.ch/fr/emplois/detail/f91c0b68-7089-4ca2-a6de-090ccd1f418f/",
+      "location": "Lausanne",
+      "Description": "Your contribution to KPMG Calculating, advising on tax positions (current and deferred taxes) in financial statements prepared under IFRS, US GAAP, of is possible under Swiss GAAP FER, OR Supporting our clients with tax reporting obligations Supporting our audit teams as the tax specialist on group and component audits, applying specialist knowledge and coordinating international teams Attend the development of tools and standardized solutions in connection with tax accounting and reporting tasks Attend the complex and multidisciplinary projects Cross-functional collaboration with experts from other divisions and other tax specialists, particularly in the areas of International and Swiss Corporate Tax, Transfer Pricing and VAT Close cooperation and coordination with our foreign KPMG offices on tax audits and projects for internationally active Swiss companies This is what makes you successful Completed bachelor's degree in economics, accounting and finance or similar, ideally completed by knowledge on tax law Initial experience and strong interest in tax and accounting topics Fluency in English, French, German skills are an advantage Open and communicative personality with a solution-oriented and team player mindset Able to work under pressure and be flexible for a seasonal business model Your benefits Flexible Work: We want to give you the support and flexibility to balance your career with life outside of work. You can benefit from hybrid working, flex time options, the opportunity to work from anywhere (for up to 10 working day per calendar year) and generous parental leave. Our commitment: Quality and integrity are key at KPMG to inspire confidence and drive change. We recognize our business's wider impact and commit to trustworthy services, with a focus on ESG (Environmental, Social, and Governance) matters for clients and employees. Come as you are: We're committed to an inclusive, diverse, and equitable workplace. Our Inclusion, Diversity and Equity (IDE) values are embedded in our policies and interactions. Join a culture that values uniqueness and diverse views. Connect with peers in communities like KNOW & KNOW Young, Pride, and Internationals at KPMG. Unlock your potential: We offer personalized training programs, a wide range of courses, and tailored career paths designed to help you reach your full potential. Our offer includes specialized courses, mentorship programs, upskilling trainings the People Manager Academy and much more. Inspired to innovate: As part of KPMG, you join other highly qualified and motivated professionals in an inspiring entrepreneurial environment. A clear mindset and strong opinions are not only encouraged at KPMG, but expected. When it comes to ideas, quality beats hierarchy. Discover KPMG - Become part of our team Our Corporate Tax experts advise national and international companies on all tax issues - from tax compliance and tax accounting to tax technology and risk management services. Our Corporate Tax team is the single point of contact for all our clients' questions about business strategies, supply chain, mergers and acquisitions, and real estate transactions. Within the Corporate Tax Team we are a dedicated Team supporting clients as well as our Audit colleagues on all Tax Accounting matters. With 300 different auditing and advisory service opportunities, our people can choose the career path that suits them best. Through our competencies in business transformation as well as ESG consulting, we support our clients in today's biggest challenges. We are a purpose-led and values driven company where your insight can create opportunities for you and contribute to a better future. Do work that matters, supported by a community that values difference and cares about you. Gain learning that'll last you a lifetime and be recognized for the impact you make. Find opportunity everywhere with KPMG. Do you have any questions? Do you have any questions? Haig Ilanjian Human Resources +41 58 249 38 80 KPMG 1005 Geneva or Lausanne"
+    }
+  ],
+  "ai_guard_traces": [
+    {
+      "job_url": "https://www.jobup.ch/fr/emplois/detail/f91c0b68-7089-4ca2-a6de-090ccd1f418f/",
+      "title": "Tax Accounting Consultant / Senior Consultant - Corporate Tax",
+      "company": "KPMG",
+      "ai_guard": {
+        "cv": {},
+        "cover_letter": {
+          "closing": {
+            "label": "CL:closing",
+            "target": 35,
+            "max_iters": 6,
+            "runs": [
+              {
+                "iter": 0,
+                "score": 88.0,
+                "note": "baseline"
+              },
+              {
+                "iter": 1,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 2,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 3,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 4,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 5,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 6,
+                "score": 44.98885416666666,
+                "note": ""
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "job_url": "https://www.jobup.ch/fr/emplois/detail/39f8e819-88b1-4ff1-8126-3cbceb656fe3/",
+      "title": "Senior Blockchain Developer - DeFi",
+      "company": "FINDERS SA",
+      "ai_guard": {
+        "cv": {},
+        "cover_letter": {
+          "closing": {
+            "label": "CL:closing",
+            "target": 35,
+            "max_iters": 6,
+            "runs": [
+              {
+                "iter": 0,
+                "score": 88.0,
+                "note": "baseline"
+              },
+              {
+                "iter": 1,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 2,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 3,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 4,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 5,
+                "score": 44.98885416666666,
+                "note": ""
+              },
+              {
+                "iter": 6,
+                "score": 44.98885416666666,
+                "note": ""
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "status": "ok"
+}
