@@ -49,9 +49,9 @@ def get_simple_driver(headless: Optional[bool] = None) -> webdriver.Chrome:
     # You can add a UA if you get blocked:
     # opts.add_argument("user-agent=Mozilla/5.0 ...")
 
-    logger.info("Initializing Chrome WebDriver for Jobup (headless=%s)...", headless)
+    # logger.info("Initializing Chrome WebDriver for Jobup (headless=%s)...", headless)
     driver = webdriver.Chrome(options=opts)
-    logger.info("Chrome WebDriver (Jobup) initialized.")
+    # logger.info("Chrome WebDriver (Jobup) initialized.")
 
     # Optional timeouts (tweak if needed)
     driver.set_page_load_timeout(45)  # seconds

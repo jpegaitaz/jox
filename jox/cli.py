@@ -23,6 +23,10 @@ from jox.workflows.quick_and_ready import run_quick_and_ready
 
 app = typer.Typer(add_completion=False)
 
+import logging
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 # -----------------------
 # Rich Theme (blue + green)
 # -----------------------

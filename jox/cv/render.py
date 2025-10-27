@@ -1,82 +1,239 @@
 from __future__ import annotations
 from typing import Dict, Any, List, Optional
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, KeepTogether, ListFlowable, ListItem, HRFlowable
+from reportlab.platypus import (
+    Paragraph, SimpleDocTemplate, Spacer,
+    ListFlowable, ListItem, HRFlowable, Table, TableStyle
+)
 from reportlab.lib import colors
 
-# ---------- Helpers ----------
-def _h(text: str) -> Paragraph:
-    return Paragraph(text, ParagraphStyle(
-        "Heading",
-        fontName="Helvetica-Bold",
-        fontSize=11.5,
-        leading=14,
-        spaceBefore=8,
-        spaceAfter=4,
-        textColor=colors.black,
-        underlineWidth=0.3,
-        underlineOffset=-2,
-    ))
+# =========================
+# Theme & Spacing
+# =========================
+THEMES = {
+    "default": {
+        "accent": colors.Color(0/255, 122/255, 98/255),        # green
+        "accent_alt": colors.Color(30/255, 96/255, 166/255),   # blue
+        "pill_bg": colors.Color(233/255, 247/255, 241/255),    # very light green
+        "text": colors.black,
+        "muted": colors.Color(0.35, 0.35, 0.35),
+        "rule": colors.Color(0/255, 122/255, 98/255),
+    }
+}
 
-def _p(text: str, size=9.7, leading=13) -> Paragraph:
-    return Paragraph(text, ParagraphStyle(
-        "Body",
-        fontName="Helvetica",
-        fontSize=size,
-        leading=leading,
-        spaceAfter=2,
-    ))
+SECTION_TOP = 14
+PARA_GAP = 5
+LINE_GAP = 3
 
-def _small(text: str) -> Paragraph:
-    return Paragraph(text, ParagraphStyle(
-        "Small",
-        fontName="Helvetica",
-        fontSize=9,
-        leading=12,
-    ))
+# =========================
+# Paragraph helpers
+# =========================
+def _h(text: str, theme=THEMES["default"]) -> Paragraph:
+    return Paragraph(
+        text.upper(),
+        ParagraphStyle(
+            "Heading",
+            fontName="Helvetica-Bold",
+            fontSize=10.5,
+            leading=13,
+            spaceBefore=SECTION_TOP,
+            spaceAfter=6,
+            textColor=theme["text"],
+        ),
+    )
 
-def _sep() -> HRFlowable:
-    return HRFlowable(width="100%", thickness=0.5, color=colors.black, spaceBefore=6, spaceAfter=6)
+def _p(text: str, size=9.7, leading=13, color=THEMES["default"]["text"]) -> Paragraph:
+    return Paragraph(
+        text,
+        ParagraphStyle(
+            "Body",
+            fontName="Helvetica",
+            fontSize=size,
+            leading=leading,
+            spaceAfter=LINE_GAP,
+            textColor=color,
+        ),
+    )
+
+def _small(text: str, color=THEMES["default"]["muted"]) -> Paragraph:
+    return Paragraph(
+        text,
+        ParagraphStyle(
+            "Small",
+            fontName="Helvetica",
+            fontSize=9,
+            leading=12,
+            textColor=color,
+        ),
+    )
+
+def _rule(theme=THEMES["default"]) -> HRFlowable:
+    return HRFlowable(
+        width="100%",
+        thickness=0.75,
+        color=theme["rule"],
+        spaceBefore=4,
+        spaceAfter=8,
+    )
 
 def _bullets(items: List[str]) -> ListFlowable:
-    li = [ListItem(_p(i), leftIndent=0) for i in items if i]
-    return ListFlowable(li, bulletType="bullet", start="•", leftIndent=10, bulletFontName="Helvetica", bulletFontSize=10)
+    # Proper ListFlowable API: use start for custom bullet char
+    li = [ListItem(_p(i), leftIndent=8) for i in items if i]
+    return ListFlowable(
+        li,
+        bulletType="bullet",
+        start="–",                 # en-dash bullet
+        leftIndent=10,
+        bulletOffsetY=1,
+        bulletFontName="Helvetica",
+        bulletFontSize=9,
+    )
 
-def _header_block(story: List, header: Dict[str, str]) -> None:
-    name = header.get("name", "").upper()
-    tagline = header.get("tagline", "")
-    contacts = " • ".join([s for s in [
-        header.get("address"), f"Phone: {header.get('phone')}" if header.get("phone") else None,
-        f"Email: {header.get('email')}" if header.get("email") else None,
-        f"Linkedin: {header.get('linkedin')}" if header.get("linkedin") else None,
-    ] if s])
+# =========================
+# “Pill” skills (Table-based)
+# =========================
+def _skills_pills(items: List[str], theme=THEMES["default"], per_row=4, max_items=8) -> Table:
+    chips = [i for i in items if i][:max_items]
+    if not chips:
+        # Return a minimal, empty table to keep flowable type consistent
+        return Table([[""]])
 
-    nat_mob = " • ".join([s for s in [
-        f"Nationality: {header.get('nationality')}" if header.get("nationality") else None,
-        f"Mobility: {header.get('mobility')}" if header.get("mobility") else None,
-    ] if s])
+    rows: List[List[Paragraph]] = []
+    row: List[Paragraph] = []
+    for i, txt in enumerate(chips, 1):
+        row.append(Paragraph(
+            f"&nbsp;{txt}&nbsp;",
+            ParagraphStyle(
+                "Pill",
+                fontName="Helvetica",
+                fontSize=9,
+                textColor=theme["accent_alt"],
+                backColor=theme["pill_bg"],
+                leading=12,
+            ),
+        ))
+        if i % per_row == 0:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
 
-    story.append(Paragraph(name, ParagraphStyle("Name", fontName="Helvetica-Bold", fontSize=16, leading=20, alignment=TA_CENTER)))
-    if tagline:
-        story.append(Paragraph(tagline, ParagraphStyle("Tag", fontName="Helvetica-Bold", fontSize=11.5, leading=14, alignment=TA_CENTER)))
-    if contacts:
-        story.append(Paragraph(contacts, ParagraphStyle("Contacts", fontName="Helvetica", fontSize=9.5, leading=12, alignment=TA_CENTER)))
-    if nat_mob:
-        story.append(Paragraph(nat_mob, ParagraphStyle("Nat", fontName="Helvetica", fontSize=9.5, leading=12, alignment=TA_CENTER)))
-    story.append(Spacer(1, 6))
+    # Normalize row widths
+    max_cols = max(len(r) for r in rows)
+    for r in rows:
+        while len(r) < max_cols:
+            r.append(Paragraph("", ParagraphStyle("Empty", fontName="Helvetica", fontSize=9)))
 
-def render_cv_pdf(path: str, _title: str, text_or_structured: Any) -> None:
+    tbl = Table(
+        rows,
+        style=TableStyle([
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0, colors.white),
+        ]),
+        hAlign="LEFT",
+    )
+    return tbl
+
+# =========================
+# Header: two-zone layout (splittable, no KeepTogether)
+# =========================
+def _header_block(story: List[Any], header: Dict[str, str], job_title_fs: str, theme=THEMES["default"]) -> None:
+    name = (header.get("name") or "").strip().upper()
+    role = (header.get("tagline") or job_title_fs or "").strip()
+
+    # Left side as a small table (splittable)
+    left_rows = [
+        [Paragraph(name, ParagraphStyle(
+            "Name",
+            fontName="Helvetica-Bold",
+            fontSize=19,
+            leading=22,
+            textColor=theme["text"],
+        ))],
+        [Paragraph(role, ParagraphStyle(
+            "Role",
+            fontName="Helvetica",
+            fontSize=12.5,
+            leading=15,
+            textColor=theme["accent_alt"],
+            spaceAfter=4,
+        ))],
+    ]
+    left_table = Table(
+        left_rows,
+        colWidths=[104*mm],  # 104 + 70 = 174mm usable width
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]),
+        repeatRows=0,
+        splitByRow=1,
+    )
+
+    # Right: contacts in 2×2 grid
+    def _fmt(label: str, value: Optional[str]) -> Paragraph:
+        if not value:
+            return Paragraph("", ParagraphStyle("Empty", fontName="Helvetica", fontSize=9))
+        return _small(f"<b>{label}:</b> {value}", color=theme["muted"])
+
+    contacts = [
+        [_fmt("City", header.get("address")), _fmt("Phone", header.get("phone"))],
+        [_fmt("Email", header.get("email")), _fmt("LinkedIn", header.get("linkedin"))],
+    ]
+    right_table = Table(
+        contacts,
+        colWidths=[35*mm, 35*mm],
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]),
+        hAlign="RIGHT",
+        repeatRows=0,
+        splitByRow=1,
+    )
+
+    # 2-column header (splittable row)
+    header_table = Table(
+        [[left_table, right_table]],
+        colWidths=[104*mm, 70*mm],  # equals 174mm (A4 - 18mm*2 margins)
+        style=TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]),
+        repeatRows=0,
+        splitByRow=1,
+    )
+
+    story.append(header_table)
+    story.append(_rule(theme))
+
+# =========================
+# Public API (unchanged signatures)
+# =========================
+def render_cv_pdf(path: str, job_title_fs: str, text_or_structured: Any) -> None:
     """
     Backwards-compatible wrapper: if dict -> structured template; else write plain.
     """
     if isinstance(text_or_structured, dict):
-        render_cv_pdf_structured(path, text_or_structured)
+        render_cv_pdf_structured(path, job_title_fs, text_or_structured)
         return
-    # fallback legacy (simple dump)
+    # legacy fallback
     c = canvas.Canvas(path, pagesize=A4)
     c.setFont("Helvetica", 10)
     textobject = c.beginText(20 * mm, 280 * mm)
@@ -86,116 +243,136 @@ def render_cv_pdf(path: str, _title: str, text_or_structured: Any) -> None:
     c.showPage()
     c.save()
 
-def render_cv_pdf_structured(path: str, data: Dict[str, Any]) -> None:
-    doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm)
+def render_cv_pdf_structured(path: str, job_title_fs: str, data: Dict[str, Any]) -> None:
+    theme = THEMES["default"]
+    doc = SimpleDocTemplate(
+        path, pagesize=A4,
+        leftMargin=18*mm, rightMargin=18*mm, topMargin=16*mm, bottomMargin=16*mm,
+        allowSplitting=True,  # ensure flowables can break across pages
+    )
     story: List[Any] = []
 
-    _header_block(story, data.get("header", {}))
+    # Header
+    _header_block(story, data.get("header", {}), job_title_fs, theme)
 
-    # Profile
-    profile = data.get("profile")
+    # ===== Page 1 focus =====
+    # Profile (keep brief)
+    profile = (data.get("profile") or data.get("summary") or "").strip()
     if profile:
-        story.append(_h("Profile"))
+        story.append(_h("Profile", theme))
         story.append(_p(profile))
-        story.append(_sep())
 
-    # Core Skills
-    core = data.get("core_skills") or []
-    if core:
-        story.append(_h("Core Skills"))
-        for group in core:
-            head = group.get("heading")
-            if head:
-                story.append(_p(f"<b>★ {head}</b>"))
-            items = group.get("bullets") or []
-            story.append(_bullets(items))
-        story.append(_sep())
+    # Core skills as pills (6–8 items max)
+    core_groups = data.get("core_skills") or []
+    first_group_items: List[str] = []
+    if core_groups:
+        g0 = core_groups[0] or {}
+        first_group_items = list((g0.get("bullets") or []))[:8]
+    if first_group_items:
+        story.append(Spacer(1, 6))
+        story.append(_skills_pills(first_group_items, theme, per_row=4, max_items=8))
 
-    # Experience
+    # Separator before Experience
+    story.append(_rule(theme))
+
+    # Experience (compact)
     exp = data.get("experience") or []
     if exp:
-        story.append(_h("Experience"))
+        story.append(_h("Experience", theme))
         for e in exp:
-            header = " • ".join([s for s in [
-                f"<b>{e.get('company','')}</b>",
-                e.get("role"),
-                e.get("location")
-            ] if s])
-            dates = e.get("dates", "")
-            story.append(_p(f"{header} • {dates}"))
+            header_bits = [s for s in [
+                f"<b>{(e.get('company') or '').strip()}</b>",
+                (e.get("role") or "").strip(),
+                (e.get("location") or "").strip(),
+                (e.get("dates") or "").strip(),
+            ] if s]
+            story.append(_p(" &#183; ".join(header_bits)))  # middot separators
             bullets = e.get("bullets") or []
-            story.append(_bullets(bullets))
-        story.append(_sep())
+            if bullets:
+                story.append(_bullets(bullets[:3]))  # 3 bullets max on page-1
+            story.append(Spacer(1, PARA_GAP))
+
+    # ===== Page 2 (depth sections) =====
+    story.append(_rule(theme))
 
     # Earlier Experience
     early = data.get("earlier_experience") or []
     if early:
-        story.append(_h("Earlier Experience"))
+        story.append(_h("Earlier Experience", theme))
         for e in early:
-            header = " • ".join([s for s in [
-                e.get("role"), e.get("company"), e.get("location"), e.get("dates")
+            header = " &#183; ".join([s for s in [
+                (e.get("role") or "").strip(),
+                (e.get("company") or "").strip(),
+                (e.get("location") or "").strip(),
+                (e.get("dates") or "").strip(),
             ] if s])
-            txt = e.get("summary", "")
-            story.append(_p(f"{header}"))
+            story.append(_p(header))
+            txt = (e.get("summary") or "").strip()
             if txt:
                 story.append(_p(txt))
-        story.append(_sep())
+        story.append(Spacer(1, PARA_GAP))
 
-    # Education
+    # Education (single-line entries)
     edu = data.get("education") or []
     if edu:
-        story.append(_h("Education"))
+        story.append(_h("Education", theme))
         for e in edu:
-            line = " • ".join([s for s in [
-                e.get("degree"), e.get("school"), e.get("country"), e.get("dates")
+            line = " &#183; ".join([s for s in [
+                (e.get("degree") or "").strip(),
+                (e.get("school") or "").strip(),
+                (e.get("country") or "").strip(),
+                (e.get("dates") or "").strip(),
             ] if s])
             story.append(_p(line))
-        story.append(_sep())
+        story.append(Spacer(1, PARA_GAP))
 
     # Certifications
     certs = data.get("certifications") or []
     if certs:
-        story.append(_h("Certifications"))
-        story.append(_bullets(certs))
-        story.append(_sep())
+        story.append(_h("Certifications", theme))
+        story.append(_bullets([c for c in certs if c]))
+        story.append(Spacer(1, PARA_GAP))
 
     # Languages
-    langs = data.get("languages") or []
+    langs = [l for l in (data.get("languages") or []) if l]
     if langs:
-        story.append(_h("Languages"))
-        story.append(_p(" • ".join(langs)))
-        story.append(_sep())
+        story.append(_h("Languages", theme))
+        story.append(_p(", ".join(langs)))
+        story.append(Spacer(1, PARA_GAP))
 
-    # Technical & Tools
-    tools = data.get("tech_tools") or []
+    # Technical & Tools (dedupe + alpha)
+    tools = [t.strip() for t in (data.get("tech_tools") or []) if t and t.strip()]
     if tools:
-        story.append(_h("Technical & Tools"))
-        story.append(_p(" • ".join(tools)))
-        story.append(_sep())
+        uniq_tools = sorted(set(tools), key=str.lower)
+        story.append(_h("Technical & Tools", theme))
+        story.append(_p(", ".join(uniq_tools)))
+        story.append(Spacer(1, PARA_GAP))
 
     # Affiliations
-    aff = data.get("affiliations") or []
+    aff = [a for a in (data.get("affiliations") or []) if a]
     if aff:
-        story.append(_h("Affiliations"))
-        story.append(_p(" • ".join(aff)))
-        story.append(_sep())
+        story.append(_h("Affiliations", theme))
+        story.append(_p(", ".join(aff)))
+        story.append(Spacer(1, PARA_GAP))
 
     # Volunteering
-    vol = data.get("volunteering") or []
+    vol = [v for v in (data.get("volunteering") or []) if v]
     if vol:
-        story.append(_h("Volunteering"))
-        story.append(_p(" • ".join(vol)))
-        story.append(_sep())
+        story.append(_h("Volunteering", theme))
+        story.append(_p(", ".join(vol)))
+        story.append(Spacer(1, PARA_GAP))
 
     # Interests
-    interests = data.get("interests") or []
+    interests = [i for i in (data.get("interests") or []) if i]
     if interests:
-        story.append(_h("Interests"))
-        story.append(_p(" • ".join(interests)))
+        story.append(_h("Interests", theme))
+        story.append(_p(", ".join(interests)))
 
     doc.build(story)
 
-
+# =========================
+# Cover Letter (unchanged signature, cleaner spacing)
+# =========================
 def render_cover_letter_pdf(path: str, _job_title_fs: str, text_or_structured: Any) -> None:
     """
     Backwards-compatible wrapper. If dict -> structured letter layout mirroring the sample.
@@ -214,11 +391,15 @@ def render_cover_letter_pdf(path: str, _job_title_fs: str, text_or_structured: A
     c.showPage()
     c.save()
 
-
 def render_cover_letter_pdf_structured(path: str, data: Dict[str, Any]) -> None:
-    # Layout: applicant address (left), recipient address (indented), place & date,
-    # Subject line, salutation, paragraphs, closing + signature.
-    doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=22*mm, rightMargin=22*mm, topMargin=20*mm, bottomMargin=20*mm)
+    """
+    Layout: sender address (left), recipient (indented), place/date, subject, salutation,
+            paragraphs, closing, signature.
+    """
+    doc = SimpleDocTemplate(
+        path, pagesize=A4,
+        leftMargin=22*mm, rightMargin=22*mm, topMargin=20*mm, bottomMargin=20*mm
+    )
     story: List[Any] = []
 
     sender = data.get("sender", {})
@@ -228,9 +409,11 @@ def render_cover_letter_pdf_structured(path: str, data: Dict[str, Any]) -> None:
     s_lines = [sender.get("name")] + (sender.get("address_lines") or [])
     r_lines = [recipient.get("company"), recipient.get("attention")] + (recipient.get("address_lines") or [])
     story.append(_small("<br/>".join(filter(None, s_lines))))
-    # recipient slightly indented to mimic sample
     story.append(Spacer(1, 2))
-    story.append(Paragraph("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + "<br/>".join(filter(None, r_lines)), ParagraphStyle("Rec", fontName="Helvetica", fontSize=9, leading=12)))
+    story.append(Paragraph(
+        "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" + "<br/>".join(filter(None, r_lines)),
+        ParagraphStyle("Rec", fontName="Helvetica", fontSize=9, leading=12),
+    ))
     story.append(Spacer(1, 8))
 
     # Place & date
@@ -255,7 +438,7 @@ def render_cover_letter_pdf_structured(path: str, data: Dict[str, Any]) -> None:
         story.append(_p(par))
         story.append(Spacer(1, 4))
 
-    # Closing
+    # Closing + signature (separate lines, no accidental concatenation)
     clos = data.get("closing", "Kind regards,")
     story.append(Spacer(1, 6))
     story.append(_p(clos))
