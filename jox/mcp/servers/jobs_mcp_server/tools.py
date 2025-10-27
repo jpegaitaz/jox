@@ -166,7 +166,7 @@ def search_jobs(
             if len(listings) >= limit:
                 break
 
-            logger.info("jobs.ch search: %s", url)
+            # logger.info("jobs.ch search: %s", url)
             driver.get(url)
 
             cards = _find_job_cards(driver)

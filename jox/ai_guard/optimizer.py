@@ -61,17 +61,20 @@ _CONTRACTIONS = {
 }
 _COMMON_ADVERBS = r"\b(really|highly|extremely|very|deeply|truly|significantly)\b"
 
+# 🔒 Remove/guard against the specific boilerplate that kept appearing
+_STOCK_BOILERPLATE_PAT = re.compile(
+    r"In practice, that means I .*?timelines people can accept\.?\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+
 # Neutral “evidence scaffolds” to expand text without inventing facts.
-# We reuse words already present in the text via _pick_hints; no numbers/names added.
+# Trimmed: we removed the “In practice…” sentence entirely.
 _EXPANSION_TEMPLATES = [
-    " In practice, that means I {verb_hint} {object_hint} with attention to {detail_hint}.",
-    " I prefer concrete steps — defining the scope, setting a simple plan, and adjusting based on feedback.",
-    " I keep it readable: short updates, a clear call-to-action, and timelines people can accept.",
-    " I’m careful to avoid generic claims and instead reference the responsibilities in the posting.",
-    " I focus on the essentials first, then add context only where it helps a decision.",
+    " I prefer concrete steps — define the scope, set a simple plan, and adjust with feedback.",
+    " I focus on essentials first and add context only when it helps a decision.",
 ]
 
-# Small pragmatic next-step cues (detectors favor these over generic closers)
+# Small pragmatic next-step cues (detectors often reward these; still neutral)
 _NEXT_STEP_TPLS = [
     " If helpful, I can share a brief example of {object_hint} this week.",
     " Happy to outline a simple plan and timelines in a short call.",
@@ -80,7 +83,8 @@ _NEXT_STEP_TPLS = [
 
 # Detect the start of a signature/valediction block (don’t expand after this).
 _SIG_PAT = re.compile(
-    r"(?im)^\s*(?:kind regards|best regards|sincerely|many thanks|cordially)\s*,?\s*$"
+    r"(?im)^\s*(?:kind regards|best regards|regards|sincerely|yours truly|"
+    r"yours faithfully|cordially|respectfully|with thanks|many thanks)\s*,?\s*$"
 )
 
 
@@ -183,32 +187,34 @@ def _rejoin_with_signature(main: str, sig: str) -> str:
     return (main.rstrip() + "\n\n" + sig.lstrip()).strip() if sig else main
 
 
-def _expand(text: str, target_len: int = _TARGET_EXPAND_CHARS) -> str:
+def _expand(text: str, target_len: int, *, allow_templates: bool) -> str:
     """
     Expand neutrally using templates + hints drawn only from the existing text.
     Avoids adding achievements, names, or numbers.
+    Can be disabled (e.g., for CL:closing/intro).
     """
-    if len(text) >= target_len:
+    if len(text) >= target_len or not allow_templates:
         return text
     hints = _pick_hints(text)
     out = text
     for tpl in _EXPANSION_TEMPLATES:
         if len(out) >= target_len:
             break
-        out = (out.rstrip() + tpl.format(**hints)).strip()
-    # Add one pragmatic next-step (detectors reward this)
-    if len(out) < target_len - 20:
-        out = (out.rstrip() + random.choice(_NEXT_STEP_TPLS).format(**hints)).strip()
+        out = (out.rstrip() + " " + tpl.format(**hints)).strip()
+    # Optionally add one pragmatic next-step
+    if len(out) < target_len - 20 and _NEXT_STEP_TPLS:
+        out = (out.rstrip() + " " + random.choice(_NEXT_STEP_TPLS).format(**hints)).strip()
     return out
 
 
-def _humanize_pass(text: str, iteration: int) -> str:
+def _humanize_pass(text: str, iteration: int, *, allow_templates: bool) -> str:
     """
     One pass:
       1) split off signature/valediction
       2) de-cliché → contractions → adverb trim → cadence on the main body
-      3) if short, EXPAND the main body (signature stays untouched)
-      4) re-join with signature
+      3) strip residual stock boilerplate
+      4) if short, EXPAND the main body (signature stays untouched; can be disabled)
+      5) re-join with signature
     """
     main, sig = _split_before_signature(text)
 
@@ -217,11 +223,16 @@ def _humanize_pass(text: str, iteration: int) -> str:
     after = _trim_adverbs(after)
     after = _vary_cadence(after)
 
+    # strip any residual stock boilerplate, just in case
+    after = _STOCK_BOILERPLATE_PAT.sub("", after).strip()
+
     if len(after) < _MIN_EXPAND_CHARS:
-        expanded = _expand(after, _TARGET_EXPAND_CHARS)
+        expanded = _expand(after, _TARGET_EXPAND_CHARS, allow_templates=allow_templates)
         if len(expanded) > len(after):
-            logger.info("AI-Guard | expand | iter %d | expanded %d→%d chars",
-                        iteration, len(after), len(expanded))
+            logger.info(
+                "AI-Guard | expand | iter %d | expanded %d→%d chars",
+                iteration, len(after), len(expanded)
+            )
         after = expanded
 
     return _rejoin_with_signature(after, sig)
@@ -248,6 +259,10 @@ def reduce_ai_likeness(
     name = label or "text"
     logger.info("AI-Guard | %s | baseline=%.1f%%", name, baseline)
 
+    # 🔒 Disable templates for CL:closing and CL:intro to avoid boilerplate in sign-off/openers
+    lower_label = (label or "").lower()
+    allow_templates = not (lower_label.startswith("cl:closing") or lower_label.startswith("cl:intro"))
+
     logs: List[IterLog] = [IterLog(iter=0, score=baseline, note="baseline")]
     current = text
     best_text = current
@@ -256,7 +271,7 @@ def reduce_ai_likeness(
     for i in range(1, iters + 1):
         if best_score <= target:
             break
-        candidate = _humanize_pass(current, i)
+        candidate = _humanize_pass(current, i, allow_templates=allow_templates)
         score = evaluate_ai_likeness(candidate)
         logger.info("AI-Guard | %s | iter %d → %.1f%% (target ≤ %d%%)", name, i, score, target)
         logs.append(IterLog(iter=i, score=score))

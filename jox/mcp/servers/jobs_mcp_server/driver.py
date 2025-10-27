@@ -16,7 +16,7 @@ def get_chrome_driver(headless: Optional[bool] = None) -> webdriver.Chrome:
     if headless is None:
         headless = os.getenv("JOBS_HEADLESS", "1") != "0"
 
-    logger.info("Initializing Chrome WebDriver for jobs.ch (headless=%s)...", headless)
+    # logger.info("Initializing Chrome WebDriver for jobs.ch (headless=%s)...", headless)
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
@@ -27,5 +27,5 @@ def get_chrome_driver(headless: Optional[bool] = None) -> webdriver.Chrome:
     opts.add_argument("--disable-gpu")
     opts.add_argument("--disable-blink-features=AutomationControlled")
     driver = webdriver.Chrome(options=opts)
-    logger.info("Chrome WebDriver (jobs.ch) initialized.")
+    # logger.info("Chrome WebDriver (jobs.ch) initialized.")
     return driver

@@ -102,6 +102,7 @@ def _collect_text_parts(cl_data: Dict[str, Any]) -> Dict[str, str]:
     return {k: v for k, v in parts.items() if v}
 
 
+# Valediction detector; used to prevent run-on closings
 _VAL_RX = _re.compile(
     r"^\s*(Kind regards|Best regards|Regards|Sincerely|Yours sincerely|Yours faithfully|"
     r"Cordialement|Bien à vous|Meilleures salutations|Saludos cordiales|Saludos|Atte)\b[ ,:]*",
@@ -220,7 +221,6 @@ class Orchestrator:
             country=country,  # some adapters use this to pick domain/locale
         )
         num_results = len(jobs)
-        logger.info("Search returned %d listings", num_results)
 
         # 2) ENRICH + SCORE ———
         THRESHOLD: float = float(getattr(SETTINGS, "compatibility_threshold", 7.5))
