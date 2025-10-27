@@ -1,4 +1,4 @@
-# JOX
+#
 
 ```text
       ██╗ ██████╗ ██╗    ██╗
@@ -13,6 +13,7 @@
 Job Orchestrator eXpress
 (search • score • tailor • guard)
 
+```
 
 JOX is a local, agentic job-search assistant that runs entirely from the terminal. It coordinates a fleet of **MCP sub-agents** to discover roles, evaluate their fit against your CV and knowledge base, and generate tailored two-page CVs, cover letters, and run summaries per shortlisted job. Optional **AI-Guard** passes rewrite generated text to sound more human while keeping facts intact. All artefacts stay on disk; outside traffic is limited to job boards and whichever LLM you configure.
 
